@@ -5,20 +5,20 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import os
 import videoto3d
-from sklearn.cross_validation import train_test_split
+from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 from keras.datasets import cifar10
 from keras.models import Sequential
-from keras.layers import Dense, Dropout, Activation, Flatten
-from keras.layers import Convolution2D, MaxPooling2D
+from keras.layers import Dense, Dropout, Activation, Flatten, GlobalAveragePooling2D
+from keras.layers import Conv2D, MaxPooling2D, BatchNormalization
 from keras.utils import np_utils
 from keras.utils.vis_utils import plot_model
 
 
 def plot_history(history, result_dir):
-    plt.plot(history.history['acc'], marker='.')
-    plt.plot(history.history['val_acc'], marker='.')
+    plt.plot(history.history['accuracy'], marker='.')
+    plt.plot(history.history['val_accuracy'], marker='.')
     plt.title('model accuracy')
     plt.xlabel('epoch')
     plt.ylabel('accuracy')
@@ -40,9 +40,9 @@ def plot_history(history, result_dir):
 
 def save_history(history, result_dir):
     loss = history.history['loss']
-    acc = history.history['acc']
+    acc = history.history['accuracy']
     val_loss = history.history['val_loss']
-    val_acc = history.history['val_acc']
+    val_acc = history.history['val_accuracy']
     nb_epoch = len(acc)
 
     with open(os.path.join(result_dir, 'result.txt'), 'w') as fp:
@@ -61,19 +61,19 @@ def loaddata(video_dir, vid3d, nclass, result_dir):
     pbar = tqdm(total=len(files))
 
     for filename in files:
+        pbar.update(1)
         if filename == '.DS_Store':
             continue
         name = os.path.join(video_dir, filename)
-        #print('loading video:{}'.format(name))
-        label = vid3d.get_UCF_classname(filename)
-        # print('label:{}'.format(label))
-        if label not in labellist:
-            if len(labellist) >= nclass:
-                continue
-            labellist.append(label)
-        labels.append(label)
-        X.append(vid3d.video3d(name))
-        pbar.update(1)
+        for v_files in os.listdir(name):
+            v_file_path = os.path.join(name, v_files)
+            label = vid3d.get_UCF_classname(filename)
+            if label not in labellist:
+                if len(labellist) >= nclass:
+                    continue
+                labellist.append(label)
+            labels.append(label)
+            X.append(vid3d.video3d(v_file_path))
 
     pbar.close()
     with open(os.path.join(result_dir, 'classes.txt'), 'w') as fp:
@@ -110,27 +110,43 @@ def main():
     # define model
     model = Sequential()
 
-    model.add(Convolution2D(32, 3, 3, border_mode='same',
-                            input_shape=X.shape[1:]))
-    model.add(Activation('relu'))
-    model.add(Convolution2D(32, 3, 3))
-    model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
+    # model.add(Convolution2D(32, 3, 3, padding='same',
+    #                         input_shape=X.shape[1:]))
+    # model.add(Activation('relu'))
+    # model.add(Convolution2D(32, 3, 3))
+    # model.add(Activation('relu'))
+    # model.add(MaxPooling2D(pool_size=(2, 2)))
+    # model.add(Dropout(0.25))
+
+    # model.add(Convolution2D(64, 3, 3, padding='same'))
+    # model.add(Activation('relu'))
+    # model.add(Convolution2D(64, 3, 3))
+    # model.add(Activation('relu'))
+    # model.add(MaxPooling2D(pool_size=(2, 2)))
+    # model.add(Dropout(0.25))
+
+    # model.add(Flatten())
+    # model.add(Dense(512))
+    # model.add(Activation('relu'))
+    # model.add(Dropout(0.5))
+    # model.add(Dense(nb_classes))
+    # model.add(Activation('softmax'))
+
+    model.add(Conv2D(filters = 32, kernel_size = (3, 3), activation = 'relu',input_shape=X.shape[1:] ))
+    model.add(Conv2D(filters = 32, kernel_size = (3, 3), activation = 'sigmoid'))
+    model.add(MaxPooling2D(pool_size = (2, 2)))
     model.add(Dropout(0.25))
 
-    model.add(Convolution2D(64, 3, 3, border_mode='same'))
-    model.add(Activation('relu'))
-    model.add(Convolution2D(64, 3, 3))
-    model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(Conv2D(filters = 64, kernel_size = (3, 3), activation = 'relu',input_shape=X.shape[1:] ))
+    model.add(Conv2D(filters = 64, kernel_size = (3, 3), activation = 'sigmoid'))
+    model.add(MaxPooling2D(pool_size = (2, 2)))
     model.add(Dropout(0.25))
 
     model.add(Flatten())
-    model.add(Dense(512))
-    model.add(Activation('relu'))
+    model.add(Dense(512, activation = 'relu'))
     model.add(Dropout(0.5))
-    model.add(Dense(nb_classes))
-    model.add(Activation('softmax'))
+    model.add(Dense(nb_classes, activation = 'softmax'))
+
 
     model.compile(loss='categorical_crossentropy',
                   optimizer='adam',
@@ -143,13 +159,13 @@ def main():
 
     history = model.fit(X_train, Y_train,
                         batch_size=args.batch,
-                        nb_epoch=args.epoch,
+                        epochs=args.epoch,
                         validation_data=(X_test, Y_test),
                         shuffle=True)
     model_json = model.to_json()
-    with open(os.path.join(args.output, 'ucf101cnnmodel.json'), 'w') as json_file:
+    with open(os.path.join(args.output, 'ucf502dcnnmodel.json'), 'w') as json_file:
         json_file.write(model_json)
-    model.save_weights(os.path.join(args.output, 'ucf101cnnmodel.hd5'))
+    model.save_weights(os.path.join(args.output, 'ucf502dcnnmodel.hd5'))
 
     loss, acc = model.evaluate(X_test, Y_test, verbose=0)
     print('Test loss:', loss)

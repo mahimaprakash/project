@@ -150,23 +150,28 @@ def main():
     # Define model
     model = Sequential()
    
-    model.add(Conv3D(32, kernel_size=(3, 3, 3), input_shape=(
+    model.add(Conv3D(64, kernel_size=(3, 3, 3), input_shape=(
         X.shape[1:]), padding='same'))
     model.add(Activation('relu'))
-
-    model.add(Conv3D(32, kernel_size=(1, 1, 1), padding='same'))
-    model.add(Activation('softmax'))
+    model.add(MaxPooling3D(pool_size=(2, 2, 2), padding='same'))
     model.add(BatchNormalization())
-    model.add(MaxPooling3D(pool_size=(3, 3, 3), padding='same'))
-    model.add(Dropout(0.25))
 
     model.add(Conv3D(64, kernel_size=(3, 3, 3), padding='same'))
-    model.add(Activation('relu'))
-
-    model.add(Conv3D(64, kernel_size=(1, 1, 1), padding='same'))
     model.add(Activation('softmax'))
+    model.add(MaxPooling3D(pool_size=(2, 2, 2), padding='same'))
+    model.add(BatchNormalization())
 
-    model.add(MaxPooling3D(pool_size=(3, 3, 3), padding='same'))
+    model.add(Conv3D(128, kernel_size=(3, 3, 3), padding='same'))
+    model.add(Activation('softmax'))
+    model.add(BatchNormalization())
+
+    model.add(Conv3D(256, kernel_size=(6, 1, 1), padding='same'))
+    model.add(Activation('softmax'))
+    model.add(Conv3D(512, kernel_size=(1, 1, 1), padding='same'))
+    model.add(Activation('softmax'))
+    model.add(MaxPooling3D(pool_size=(2, 2, 2), padding='same'))
+    model.add(BatchNormalization())
+
     model.add(Dropout(0.25))
     
     model.add(Flatten())
